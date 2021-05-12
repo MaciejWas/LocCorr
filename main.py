@@ -27,10 +27,8 @@ def objective(trial: optuna.Trial):
     run_name = "trial_{}".format(trial.number)
 
     checkpoint_callback = ModelCheckpoint(
-        os.path.join("runs", run_name), monitor="val_loss"
+        dirpath=os.path.join("models", run_name), monitor="val_loss", mode="min", save_last=True
     )
-
-    pruning_callback = PyTorchLightningPruningCallback(trial, monitor="val_mae")
 
     tb_logger = TensorBoardLogger(save_dir="logs")
     csv_logger = CSVLogger("csv_logs", name=run_name)
@@ -39,20 +37,20 @@ def objective(trial: optuna.Trial):
         logger=[tb_logger, csv_logger],
         checkpoint_callback=True,
         val_check_interval=0.33,
-        max_epochs=10,
+        max_epochs=8,
         gpus=1,
-        callbacks=[checkpoint_callback, pruning_callback],
+        callbacks=checkpoint_callback,
         auto_lr_find=True,
     )
 
-    train_dataloader, test_dataloader = create_train_test_dataloaders(fake=False)
-    model = CorrectionModel(trial)
+    train_dataloader, val_dataloader, _ = create_train_test_dataloaders(fake_examles=True)
+    model = CorrectionModel(trial=trial)
 
     try:
-        trainer.fit(model, train_dataloader, test_dataloader)
+        trainer.fit(model, train_dataloader, val_dataloader)
     except RuntimeError:
-        return 1000
-        
+        return 1
+
     return find_smallest_mae(run_name)
 
 
@@ -105,19 +103,19 @@ if __name__ == "__main__":
     study.enqueue_trial(
         {
             "number_of_layers": 4,
-            "layer_0_width": 70,
-            "layer_1_width": 492,
-            "layer_2_width": 1453,
-            "layer_3_width": 1500,
-            "dropout": 0.235,
+            "layer_0_width": 1030,
+            "layer_1_width": 150,
+            "layer_2_width": 1033,
+            "layer_3_width": 468,
+            "dropout": 0.5097128586459475,
             "activ_type": "ReLU",
-            "loss_fn": "mse",
-            "lr": 0.00012,
-            "alpha": 4.217,
+            "loss_fn": "mae",
+            "lr": 0.0003022651981276079,
+            "alpha": 1.4326179329364277,
         }
     )
 
-    study.optimize(objective, n_trials=400, timeout=60 * 60 * 8)
+    study.optimize(objective, n_trials=150, timeout=60 * 60 * 8)
 
     print("Number of finished trials: {}".format(len(study.trials)))
 
@@ -131,7 +129,7 @@ if __name__ == "__main__":
     for key, value in best_trial.params.items():
         print("\t{}: {}".format(key, value))
 
-    with open("best_trial.pkl") as f:
-        pickle.dump(best_trial, f)
+    with open("study.pkl", "wb") as f:
+        pickle.dump(study, f)
 
-    print("Dumped best trial!")
+    print("Dumped study.")

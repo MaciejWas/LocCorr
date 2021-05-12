@@ -4,6 +4,8 @@ from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 import tqdm
 import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.neighbors import KNeighborsRegressor
 
 
 M = torch.tensor([3801.7295, 1594.2151, 3851.0134, 1507.4651], dtype=torch.float64)
@@ -32,7 +34,7 @@ def scatterplot_tensor_dataset(X: torch.Tensor, skip: float = 0.5):
 def create_table(test: bool):
     whole_dataset = pd.DataFrame()
 
-    substr = "dynamic" if test else "stat"
+    substr = "" #"dynamic" if test else "stat"
 
     path = os.path.join("Task", "F8")
     files_at_path = [
@@ -53,16 +55,23 @@ def create_table(test: bool):
     return whole_dataset
 
 
-def create_train_test_dataloaders(fake: bool = False):
-    """If `fake` is set to True fake data will be added to the dataset."""
+def create_train_test_dataloaders(fake_examles: bool = False):
+    """If `fake_examles` is set to True fake data will be added to the dataset."""
     
-    train_dataset = Dataset(fake)
-    test_dataset = TestDataset()
+    dataset = Dataset(fake_examles=fake_examles)
 
-    train_dataloader = DataLoader(train_dataset, batch_size=32_000, shuffle=True)
-    test_dataloader = DataLoader(test_dataset, batch_size=32_000, shuffle=False)
+    n = len(dataset)
+    train_n = round(.70 * n)
+    val_n = (n - train_n) // 2
+    test_n = n - train_n - val_n
 
-    return train_dataloader, test_dataloader
+    train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_n, val_n, test_n])
+
+    train_dataloader = DataLoader(train_dataset, batch_size=4096 * 8, shuffle=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=4096 * 8, shuffle=False)
+    test_dataloader = DataLoader(test_dataset, batch_size=4096 * 8, shuffle=False)
+
+    return train_dataloader, val_dataloader, test_dataloader
 
 
 def generate_fake_examples(original: torch.Tensor, n=4):
@@ -70,13 +79,13 @@ def generate_fake_examples(original: torch.Tensor, n=4):
 
     k_neighbors_regr = KNeighborsRegressor(n_neighbors=n, weights="uniform", n_jobs=12)
 
-    estimated_pos = available_data_stand[:, [0, 1]]
-    real_pos = available_data_stand[:, [2, 3]]
+    estimated_pos = original[:, [0, 1]]
+    real_pos = original[:, [2, 3]]
 
     k_neighbors_regr.fit(estimated_pos, real_pos - estimated_pos)
 
-    all_x = (torch.rand(500) - 0.5) * 4
-    all_y = (torch.rand(500) - 0.5) * 4
+    all_x = (torch.rand(200) - 0.5) * 4
+    all_y = (torch.rand(200) - 0.5) * 4
 
     new_data_coor = torch.tensor([[x, y] for x in all_x for y in all_y])
 
@@ -101,7 +110,7 @@ def generate_fake_examples(original: torch.Tensor, n=4):
 
 
 class Dataset(Dataset):
-    def __init__(self, fake):
+    def __init__(self, fake_examles):
         """The main dataset. Will add fake learning examples if `fake` is True."""
 
         if "tensor_dataset.pt" not in os.listdir():
@@ -121,56 +130,15 @@ class Dataset(Dataset):
 
             self.tensor_dataset = (self.tensor_dataset - M) / STD
 
-            if fake:
-                fake_examples = generate_fake_examples(self.tensor_dataset)
+            if fake_examles:
+                fake_examples_tensor = generate_fake_examples(self.tensor_dataset)
 
-                self.tensor_dataset = torch.cat((tensor_dataset, fake_examples), dim=0)
+                self.tensor_dataset = torch.cat((self.tensor_dataset, fake_examples_tensor), dim=0)
 
             torch.save(self.tensor_dataset, "tensor_dataset.pt")
 
         else:
             self.tensor_dataset = torch.load("tensor_dataset.pt")
-
-    def __len__(self):
-        return len(self.tensor_dataset)
-
-    def __getitem__(self, idx):
-        real_position = self.tensor_dataset[idx, [2, 3]]
-        est_position = self.tensor_dataset[idx, [0, 1]]
-        difference = real_position - est_position
-
-        return {"diff": difference, "est": est_position}
-
-
-class TestDataset(Dataset):
-    def __init__(self):
-        if "test_tensor_dataset.pt" not in os.listdir():
-            self.dataset_table = create_table(test=True)
-
-            print(f"Appended {len(self.dataset_table)} rows in total.")
-
-            self.dataset_table = self.dataset_table.reset_index(drop=True)
-            self.dataset_table = self.dataset_table.dropna(axis="rows")
-
-            print(f"\tAfter deleting NaNs: {len(self.dataset_table)}.")
-
-            self.dataset_table = self.dataset_table.applymap(float)
-            self.tensor_dataset = torch.tensor(self.dataset_table.values)
-            print("Standardizing dataset:")
-
-            self.tensor_dataset = (self.tensor_dataset - M) / STD
-            list_fromtensor = self.tensor_dataset.tolist()
-
-            torch.save(self.tensor_dataset, "test_tensor_dataset.pt")
-
-        else:
-            self.tensor_dataset = torch.load("test_tensor_dataset.pt")
-
-        mae = torch.nn.functional.l1_loss(
-            self.tensor_dataset[:, [0, 1]], self.tensor_dataset[:, [2, 3]]
-        )
-
-        print(f"Loaded test dataset. MAE(X, Y) =", mae.item())
 
     def __len__(self):
         return len(self.tensor_dataset)

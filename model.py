@@ -18,23 +18,39 @@ def activation(activ_type: str):
 
 
 class CorrectionModel(pl.LightningModule):
-    def __init__(self, trial: optuna.Trial):
+    def __init__(self, trial: optuna.Trial=None, conf: dict=None):
         super().__init__()
 
-        self.number_of_layers = trial.suggest_int("number_of_layers", 2, 6)
+        if trial:
+            self.number_of_layers = trial.suggest_int("number_of_layers", 2, 6)
 
-        layer_widths = []
-        for i in range(0, self.number_of_layers):
-            max_width = 500 if i > 3 else 1500
-            layer_widths.append(trial.suggest_int(f"layer_{i}_width", 20, max_width))
+            layer_widths = []
+            for i in range(0, self.number_of_layers):
+                max_width = 500 if i > 3 else 1500
+                layer_widths.append(trial.suggest_int(f"layer_{i}_width", 20, max_width))
 
-        self.dropout = trial.suggest_uniform("dropout", 0.2, 0.8)
-        self.activ_type = trial.suggest_categorical(
-            "activ_type", ["ReLU", "ELU", "LeakyReLU"]
-        )
-        self.loss_fn = trial.suggest_categorical("loss_fn", ["mae", "mse"])
-        self.lr = trial.suggest_loguniform("lr", 1e-8, 1e-2)
-        self.alpha = trial.suggest_uniform("alpha", 0.8, 5.0)
+            self.dropout = trial.suggest_uniform("dropout", 0.2, 0.8)
+            self.activ_type = trial.suggest_categorical(
+                "activ_type", ["ReLU", "ELU", "LeakyReLU"]
+            )
+            self.loss_fn = trial.suggest_categorical("loss_fn", ["mae", "mse"])
+            self.lr = trial.suggest_loguniform("lr", 1e-8, 1e-2)
+            self.alpha = trial.suggest_uniform("alpha", 0.8, 5.0)
+
+        else:
+            self.number_of_layers = conf["number_of_layers"]
+
+            layer_widths = []
+            for i in range(0, self.number_of_layers):
+                max_width = 500 if i > 3 else 1500
+                layer_widths.append(conf[f"layer_{i}_width"])
+
+            self.dropout = conf["dropout"]
+            self.activ_type = conf["activ_type"]
+            self.loss_fn = conf["loss_fn"]
+            self.lr = conf["lr"]
+            self.alpha = conf["alpha"]
+
 
         modules = []
 
