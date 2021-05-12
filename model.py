@@ -25,7 +25,7 @@ class CorrectionModel(pl.LightningModule):
 
         layer_widths = []
         for i in range(0, self.number_of_layers):
-            max_width = 500 if i > 3 else 2000
+            max_width = 500 if i > 3 else 1500
             layer_widths.append(trial.suggest_int(f"layer_{i}_width", 20, max_width))
 
         self.dropout = trial.suggest_uniform("dropout", 0.2, 0.8)
