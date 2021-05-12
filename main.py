@@ -47,8 +47,12 @@ def objective(trial: optuna.Trial):
 
     train_dataloader, test_dataloader = create_train_test_dataloaders(fake=False)
     model = CorrectionModel(trial)
-    trainer.fit(model, train_dataloader, test_dataloader)
 
+    try:
+        trainer.fit(model, train_dataloader, test_dataloader)
+    except RuntimeError:
+        return 1000
+        
     return find_smallest_mae(run_name)
 
 
@@ -72,9 +76,9 @@ if __name__ == "__main__":
     study.enqueue_trial(
         {
             "number_of_layers": 6,
-            "layer_0_width": 1723,
-            "layer_1_width": 1770,
-            "layer_2_width": 1767,
+            "layer_0_width": 1500,
+            "layer_1_width": 1500,
+            "layer_2_width": 1500,
             "layer_3_width": 134,
             "layer_4_width": 130,
             "layer_5_width": 373,
@@ -104,7 +108,7 @@ if __name__ == "__main__":
             "layer_0_width": 70,
             "layer_1_width": 492,
             "layer_2_width": 1453,
-            "layer_3_width": 1920,
+            "layer_3_width": 1500,
             "dropout": 0.235,
             "activ_type": "ReLU",
             "loss_fn": "mse",
