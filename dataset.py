@@ -14,20 +14,18 @@ STD = torch.tensor([2200.4813, 775.9291, 2175.2612, 775.4867], dtype=torch.float
 
 def scatterplot_tensor_dataset(X: torch.Tensor, skip: float = 0.5):
     sns.set()
-
     every_n = round(1 / skip)
-
     X_smaller = X[::every_n]
-
+    
     fig, ax = plt.subplots(figsize=(10, 10))
 
     sns.scatterplot(
         x=X_smaller[:, 0], y=X_smaller[:, 1], color="blue", size=4, ax=ax
     )
-
     sns.scatterplot(
         x=X_smaller[:, 2], y=X_smaller[:, 3], color="red", size=4, alpha=0.5, ax=ax
     )
+    
     plt.show()
 
 
